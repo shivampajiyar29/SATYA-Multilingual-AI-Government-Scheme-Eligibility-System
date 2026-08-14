@@ -316,43 +316,6 @@ cd frontend
 npm run dev
 ```
 
----
-
-## 👨‍💻 Author
-
-**Shivam Pajiyar**
-
-- Artificial Intelligence & Data Science Student
-- CMR Institute of Technology, Bengaluru
-- 📧 Email: shpa23ainds@cmrit.ac.in
-- 🐙 GitHub: https://github.com/shivampajiyar29
-
----
-
-## 🛡️ License
-
-This project is licensed under the **MIT License**.
-
-See the [LICENSE](LICENSE) file for details.
-
-Copyright (c) 2026 Shivam Pajiyar
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-pip install -r requirements.txt
-
-# Seed the database
-
-python seed.py
-
-# Start the Flask Server on port 5000
-
-python app.py
-
-````
 
 ### 2. Frontend Setup
 
@@ -436,6 +399,40 @@ _(To be added: DocumentVault Dashboard, Review Modal, Diagnostics Page, and Sche
 
 ---
 
+---
+
+## 👨‍💻 Author
+
+**Shivam Pajiyar**
+
+- Artificial Intelligence & Data Science Student
+- CMR Institute of Technology, Bengaluru
+- 📧 Email: shpa23ainds@cmrit.ac.in
+- 🐙 GitHub: https://github.com/shivampajiyar29
+
+---
+
 ## 🛡️ License
 
-This project is for educational and research purposes under the SATYA initiative.
+This project is licensed under the **MIT License**.
+
+See the [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2026 Shivam Pajiyar
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+pip install -r requirements.txt
+
+# Seed the database
+
+python seed.py
+
+# Start the Flask Server on port 5000
+
+python app.py
+
+````
