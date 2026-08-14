@@ -52,6 +52,9 @@ class DocumentVault:
             "confidence": float(record.get("confidence", 0) or 0),
             "confidence_tier": record.get("confidence_tier", ""),
             "field_confidence": VaultUtils.to_serializable(record.get("field_confidence", {})),
+            "identity_match_score": float(record.get("identity_match_score", 0) if record.get("identity_match_score") is not None else (record.get("match", 0) or 0)),
+            "match": float(record.get("match", 0) if record.get("match") is not None else (record.get("identity_match_score", 0) or 0)),
+            "quality_score": float(record.get("quality_score", 0) if record.get("quality_score") is not None else (record.get("quality", {}).get("quality_score", 0) if isinstance(record.get("quality"), dict) else 0)),
 
             # Processing metrics
             "processing_time": float(record.get("processing_time", 0) or 0),

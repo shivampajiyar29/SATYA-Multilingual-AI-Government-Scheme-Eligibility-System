@@ -418,8 +418,19 @@ def preview_document(document_id):
     if not doc or not doc.get("storage_path") or not os.path.exists(doc["storage_path"]):
         return jsonify({"error": "File not found"}), 404
         
-    mimetype = "application/pdf" if doc.get("file_type") == "pdf" else f"image/{doc.get('file_type', 'jpeg')}"
-    return send_file(doc["storage_path"], mimetype=mimetype)
+    try:
+        storage_path = doc["storage_path"]
+        file_type = doc.get("file_type", "jpeg")
+        mimetype = "application/pdf" if file_type == "pdf" else f"image/{file_type if file_type != 'jpg' else 'jpeg'}"
+        
+        temp_dir = os.path.join(tempfile.gettempdir(), "vault_previews")
+        os.makedirs(temp_dir, exist_ok=True)
+        decrypted_path = os.path.join(temp_dir, f"preview_{uuid.uuid4().hex}_{os.path.basename(storage_path)}")
+        SecurityManager.decrypt_file(storage_path, decrypted_path)
+        return send_file(decrypted_path, mimetype=mimetype)
+    except Exception as e:
+        logger.error(f"Error in preview_document: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @vault_bp.route("/thumbnail/<document_id>", methods=["GET"])
 def thumbnail_document(document_id):

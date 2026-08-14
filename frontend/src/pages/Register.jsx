@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { Mail, Lock, User, UserPlus } from 'lucide-react';
-
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Mail, Lock, User, UserPlus } from "lucide-react";
+import API_BASE_URL from "../config/api";
 const Register = () => {
   const { t } = useTranslation();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'citizen' });
-  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "citizen",
+  });
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -17,23 +22,23 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       });
       const data = await response.json();
-      
+
       if (response.ok) {
-        navigate('/login');
+        navigate("/login");
       } else {
-        setError(data.error || t('RegistrationFailed', 'Registration failed'));
+        setError(data.error || t("RegistrationFailed", "Registration failed"));
       }
     } catch (err) {
-      setError(t('ConnectionError', 'Cannot connect to server'));
+      setError(t("ConnectionError", "Cannot connect to server"));
     } finally {
       setLoading(false);
     }
@@ -43,69 +48,85 @@ const Register = () => {
     <div className="animate-fade-in" style={styles.container}>
       <div className="glass-card" style={styles.card}>
         <div style={styles.header}>
-          <h2 style={{ fontSize: '2rem', marginBottom: '10px' }}>{t('CreateAccount')}</h2>
-          <p style={{ color: 'var(--text-muted)' }}>{t('RegisterSubtitle')}</p>
+          <h2 style={{ fontSize: "2rem", marginBottom: "10px" }}>
+            {t("CreateAccount")}
+          </h2>
+          <p style={{ color: "var(--text-muted)" }}>{t("RegisterSubtitle")}</p>
         </div>
 
         {error && <div style={styles.errorBanner}>{error}</div>}
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label>{t('Name')}</label>
+            <label>{t("Name")}</label>
             <div style={styles.inputWrapper}>
               <User size={18} style={styles.icon} color="var(--text-muted)" />
-              <input 
-                type="text" 
-                name="name" 
-                value={formData.name} 
-                onChange={handleChange} 
-                required 
-                style={styles.input} 
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                style={styles.input}
                 placeholder="Ravi Kumar"
               />
             </div>
           </div>
 
           <div style={styles.inputGroup}>
-            <label>{t('EmailAddress')}</label>
+            <label>{t("EmailAddress")}</label>
             <div style={styles.inputWrapper}>
               <Mail size={18} style={styles.icon} color="var(--text-muted)" />
-              <input 
-                type="email" 
-                name="email" 
-                value={formData.email} 
-                onChange={handleChange} 
-                required 
-                style={styles.input} 
-                placeholder={t('EmailPlaceholder')}
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                style={styles.input}
+                placeholder={t("EmailPlaceholder")}
               />
             </div>
           </div>
 
           <div style={styles.inputGroup}>
-            <label>{t('Password')}</label>
+            <label>{t("Password")}</label>
             <div style={styles.inputWrapper}>
               <Lock size={18} style={styles.icon} color="var(--text-muted)" />
-              <input 
-                type="password" 
-                name="password" 
-                value={formData.password} 
-                onChange={handleChange} 
-                required 
-                style={styles.input} 
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                style={styles.input}
                 placeholder="••••••••"
                 minLength={6}
               />
             </div>
           </div>
 
-          <button type="submit" className="btn-primary" style={styles.submitBtn} disabled={loading}>
-            {loading ? t('CreatingAccount') : <><UserPlus size={18} /> {t('Register')}</>}
+          <button
+            type="submit"
+            className="btn-primary"
+            style={styles.submitBtn}
+            disabled={loading}
+          >
+            {loading ? (
+              t("CreatingAccount")
+            ) : (
+              <>
+                <UserPlus size={18} /> {t("Register")}
+              </>
+            )}
           </button>
         </form>
 
         <p style={styles.footerText}>
-          {t('AlreadyAccount')} <Link to="/login" style={styles.link}>{t('LoginHere')}</Link>
+          {t("AlreadyAccount")}{" "}
+          <Link to="/login" style={styles.link}>
+            {t("LoginHere")}
+          </Link>
         </p>
       </div>
     </div>
@@ -114,72 +135,72 @@ const Register = () => {
 
 const styles = {
   container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '80vh',
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "80vh",
   },
   card: {
-    width: '100%',
-    maxWidth: '450px',
-    padding: '40px',
+    width: "100%",
+    maxWidth: "450px",
+    padding: "40px",
   },
   header: {
-    textAlign: 'center',
-    marginBottom: '30px',
+    textAlign: "center",
+    marginBottom: "30px",
   },
   form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
   },
   inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
   },
   inputWrapper: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
   },
   icon: {
-    position: 'absolute',
-    left: '15px',
+    position: "absolute",
+    left: "15px",
   },
   input: {
-    width: '100%',
-    padding: '12px 15px 12px 45px',
-    fontSize: '1rem',
-    background: 'rgba(0, 0, 0, 0.2)',
+    width: "100%",
+    padding: "12px 15px 12px 45px",
+    fontSize: "1rem",
+    background: "rgba(0, 0, 0, 0.2)",
   },
   submitBtn: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '15px',
-    fontSize: '1.1rem',
-    marginTop: '10px',
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "10px",
+    padding: "15px",
+    fontSize: "1.1rem",
+    marginTop: "10px",
   },
   footerText: {
-    textAlign: 'center',
-    marginTop: '25px',
-    color: 'var(--text-muted)',
+    textAlign: "center",
+    marginTop: "25px",
+    color: "var(--text-muted)",
   },
   link: {
-    color: 'var(--primary-color)',
+    color: "var(--primary-color)",
     fontWeight: 600,
   },
   errorBanner: {
-    background: 'rgba(239, 68, 68, 0.1)',
-    color: 'var(--error-color)',
-    padding: '10px',
-    borderRadius: 'var(--border-radius)',
-    textAlign: 'center',
-    marginBottom: '20px',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-  }
+    background: "rgba(239, 68, 68, 0.1)",
+    color: "var(--error-color)",
+    padding: "10px",
+    borderRadius: "var(--border-radius)",
+    textAlign: "center",
+    marginBottom: "20px",
+    border: "1px solid rgba(239, 68, 68, 0.3)",
+  },
 };
 
 export default Register;

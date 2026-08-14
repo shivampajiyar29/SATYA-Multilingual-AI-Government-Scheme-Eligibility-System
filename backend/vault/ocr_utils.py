@@ -494,24 +494,21 @@ def _merge_field(current: Dict, value: str, confidence: float, source: str):
 
 def _extract_name_from_text_block(text, user_name=None):
     text = _normalize_text(text)
-    lines = [line.strip() for line in re.split(r"[\r\n]+", text) if line.strip()]
     patterns = [
         r"\bname\b\s*[:\-]\s*([^\n\r,;|]+)",
         r"\bholder name\b\s*[:\-]\s*([^\n\r,;|]+)",
         r"\bresident name\b\s*[:\-]\s*([^\n\r,;|]+)",
+        r"\b([A-Z][a-z]{2,20}\s+[A-Z][a-z]{2,20})\b",
     ]
-    match = _first_regex_match(patterns, text)
-    if match:
-        return _field(VaultUtils.canonicalize_name(match.group(1)), 97.0, "label")
-
-    for line in lines:
-        line_l = line.lower()
-        if any(keyword in line_l for keyword in ["uidai", "government", "india", "aadhaar", "address", "dob", "gender", "qr", "pincode", "certificate", "passport", "license"]):
-            continue
-        if re.fullmatch(r"[^\W\d_][\w\s\.\'\-]{2,}", line, flags=re.UNICODE):
-            candidate = VaultUtils.canonicalize_name(line)
-            if candidate:
-                return _field(candidate, 88.0, "line")
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            raw_val = match.group(1).strip()
+            stop_keywords = [r"\bdob\b", r"\bdate of birth\b", r"\bgender\b", r"\baadhaar\b", r"\baadhar\b", r"\baddress\b", r"\bs/o\b", r"\bd/o\b", r"\bw/o\b", r"\b\d{4}-\d{2}-\d{2}\b", r"\b\d{2}/\d{2}/\d{4}\b"]
+            for sk in stop_keywords:
+                raw_val = re.split(sk, raw_val, flags=re.IGNORECASE)[0].strip(" ,;:-")
+            candidate = VaultUtils.canonicalize_name(raw_val)
+            if candidate and len(candidate.split()) >= 1 and not any(kw in candidate.lower() for kw in ["government", "india", "aadhaar", "aadhar", "sarkar", "bharat", "powered", "digilocker", "zoom"]):
+                return _field(candidate, 95.0, "pattern")
 
     if user_name:
         return _field(VaultUtils.canonicalize_name(user_name), 70.0, "profile")
@@ -547,18 +544,21 @@ def _extract_gender_from_text_block(text):
 def _extract_aadhaar_number(text):
     text = _normalize_text(text)
     patterns = [
-        r"\b(?:aadhaar|aadhar|uid|uidai)\s*(?:number|no|id)?\s*[:\-]?\s*([0-9]{4}\s*[0-9]{4}\s*[0-9]{4})\b",
+        r"\b(?:aadhaar|aadhar|uid|uidai)\s*(?:number|no|id)?\s*[:\-]?\s*([0-9xX\-\s]{8,20})\b",
+        r"\b([xX0-9]{4}[\s\-]?[xX0-9]{4}[\s\-]?[0-9]{4})\b",
+        r"\b([xX]{4,8}[0-9]{4})\b",
         r"\b([0-9]{4}\s*[0-9]{4}\s*[0-9]{4})\b",
         r"\b([0-9]{12})\b",
     ]
-    match = _first_regex_match(patterns, text)
-    if match:
-        digits = re.sub(r"\D", "", match.group(1))
-        if len(digits) == 12:
-            return _field(VaultUtils.mask_aadhaar(digits), 97.0, "pattern")
-    digits = re.sub(r"\D", "", text)
-    if len(digits) >= 12:
-        return _field(VaultUtils.mask_aadhaar(digits[-12:]), 88.0, "digits")
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            matched_str = match.group(1) if match.lastindex else match.group(0)
+            digits = re.sub(r"\D", "", matched_str)
+            if len(digits) == 12:
+                return _field(VaultUtils.mask_aadhaar(digits), 99.0, "pattern")
+            elif len(digits) >= 4 and any(c in matched_str for c in "xX"):
+                last4 = digits[-4:]
+                return _field(f"XXXX-XXXX-{last4}", 99.0, "masked_pattern")
     return _field()
 
 
@@ -752,10 +752,10 @@ def _extract_aadhaar_structured_fields(image, user_name=None, qr_payload=None, h
 
     fields = OrderedDict()
     fields["document_language"] = _field(language_hints[0] if language_hints else "eng", 70.0, "language")
-    fields["name"] = _refine_field("name", _extract_name_from_text_block(" ".join([qr_text, region_texts.get("header", ""), region_texts.get("full_top", ""), combined_text]), user_name=user_name), "aadhaar")
+    fields["name"] = _refine_field("name", _extract_name_from_text_block(" ".join([region_texts.get("header", ""), region_texts.get("full_top", ""), combined_text]), user_name=user_name), "aadhaar")
     fields["dob"] = _refine_field("dob", _extract_dob_from_text_block(" ".join([qr_text, region_texts.get("identity_block", ""), combined_text])), "aadhaar")
     fields["gender"] = _refine_field("gender", _extract_gender_from_text_block(" ".join([qr_text, region_texts.get("identity_block", ""), combined_text])), "aadhaar")
-    fields["masked_aadhaar"] = _refine_field("masked_aadhaar", _extract_aadhaar_number(" ".join([qr_text, region_texts.get("number_block", ""), combined_text])), "aadhaar")
+    fields["masked_aadhaar"] = _refine_field("masked_aadhaar", _extract_aadhaar_number(" ".join([region_texts.get("number_block", ""), combined_text])), "aadhaar")
     fields["aadhaar_reference_id"] = _refine_field("aadhaar_reference_id", _field(qr_fields.get("reference_id", ""), 95.0, "qr") if qr_fields.get("reference_id") else _field(), "qr")
     fields["address"] = _refine_field("address", _extract_address_from_text_block(" ".join([qr_text, region_texts.get("address_block", ""), combined_text])), "aadhaar")
     fields["district"] = _field("", 0.0, "")
@@ -769,7 +769,7 @@ def _extract_aadhaar_structured_fields(image, user_name=None, qr_payload=None, h
         fields["dob"] = _merge_field(fields["dob"], VaultUtils.normalize_date(qr_fields["dob"]), 99.0, "qr")
     if qr_fields.get("gender"):
         fields["gender"] = _merge_field(fields["gender"], VaultUtils.normalize_gender(qr_fields["gender"]), 99.0, "qr")
-    if qr_fields.get("aadhaar_number"):
+    if qr_fields.get("aadhaar_number") and len(re.sub(r"\D", "", qr_fields["aadhaar_number"])) == 12:
         fields["masked_aadhaar"] = _field(VaultUtils.mask_aadhaar(qr_fields["aadhaar_number"]), 99.0, "qr")
 
     address_value = fields["address"]["value"]
@@ -1013,23 +1013,24 @@ def _ocr_easyocr(image, lang="en"):
             lang = [lang]
         lang = _build_easyocr_langs(lang)
         if _EASYOCR_READER is None:
-            _EASYOCR_READER = easyocr.Reader(lang, gpu=False)
+            _EASYOCR_READER = easyocr.Reader(lang, gpu=False, verbose=False)
         candidates = []
-        for processed in _enhance_image(image):
-            result = _EASYOCR_READER.readtext(processed, detail=1, paragraph=True)
-            text_parts = []
-            scores = []
-            for item in result or []:
-                if len(item) >= 2:
-                    text_parts.append(str(item[1]))
-                    if len(item) > 2:
-                        scores.append(float(item[2]))
-            text = _normalize_text(" ".join(text_parts))
-            if text:
-                confidence = _score_text(text, (sum(scores) / max(len(scores), 1)) * 100 if scores else 68.0)
-                candidates.append(OCRCandidate("easyocr", lang, text, confidence))
+        gray = _ensure_gray(image)
+        result = _EASYOCR_READER.readtext(gray, detail=1, paragraph=True)
+        text_parts = []
+        scores = []
+        for item in result or []:
+            if len(item) >= 2:
+                text_parts.append(str(item[1]))
+                if len(item) > 2:
+                    scores.append(float(item[2]))
+        text = _normalize_text(" ".join(text_parts))
+        if text:
+            confidence = _score_text(text, (sum(scores) / max(len(scores), 1)) * 100 if scores else 88.0)
+            candidates.append(OCRCandidate("easyocr", "en", text, confidence))
         return candidates
-    except Exception:
+    except Exception as e:
+        logger.error("[OCR] EasyOCR exception: %s", e)
         return []
 
 
@@ -1133,7 +1134,7 @@ def ocr_document(file_path, lang_hints=None):
     paddle_candidates = _ocr_paddleocr(image, lang="en")
     candidates.extend(paddle_candidates)
 
-    # Step 4: Fallback - Tesseract only if PaddleOCR returned nothing
+    # Step 4: Fallback - Tesseract
     if not candidates or not any(c.text for c in candidates):
         logger.warning("[OCR] PaddleOCR returned no text. Falling back to Tesseract.")
         tess_lang = _build_tesseract_lang_string(lang_hints)
@@ -1144,7 +1145,15 @@ def ocr_document(file_path, lang_hints=None):
         else:
             logger.warning("[OCR] Tesseract fallback also returned no text.")
 
-    if not candidates:
+    # Step 5: Fallback - EasyOCR
+    if not candidates or not any(c.text for c in candidates):
+        logger.warning("[OCR] PaddleOCR & Tesseract returned no text. Falling back to EasyOCR.")
+        easy_candidates = _ocr_easyocr(image, lang=lang_hints)
+        candidates.extend(easy_candidates)
+        if easy_candidates:
+            logger.info("[OCR] EasyOCR fallback produced %d candidates.", len(easy_candidates))
+
+    if not candidates or not any(c.text for c in candidates):
         logger.error("[OCR] All OCR engines failed for: %s", file_path)
         return {"best": OCRCandidate("none", "none", "", 0.0), "candidates": []}
 

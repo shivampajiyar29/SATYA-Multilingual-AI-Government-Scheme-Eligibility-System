@@ -211,15 +211,11 @@ class DocumentManager:
         if image is None:
             return None
         try:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            gray = cv2.equalizeHist(gray)
-            gray = cv2.GaussianBlur(gray, (3, 3), 0)
-            gray = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 11)
-            gray = cv2.medianBlur(gray, 3)
-            gray = cv2.equalizeHist(gray)
-
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image.copy()
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
             processed_path = os.path.join(TEMP_ROOT, f"preprocessed_{uuid.uuid4().hex}.png")
-            cv2.imwrite(processed_path, gray)
+            cv2.imwrite(processed_path, enhanced)
             return processed_path
         except Exception:
             return image_path
@@ -393,16 +389,16 @@ class DocumentManager:
             }
             timings["metadata"] = round(time.time() - t0, 3)
 
-            # ── Build per-field confidence map ───────────────────────────────────
-            field_confidence = {}
-            for field_key, field_val in structured_fields.items():
-                if isinstance(field_val, dict) and field_val.get("value"):
-                    field_confidence[field_key] = round(float(field_val.get("confidence", 0.0)), 1)
-
             # ── Build ocr_data (immutable) ───────────────────────────────────────
+            doc_number = (
+                structured_fields.get("masked_aadhaar", {}).get("value", "")
+                or structured_fields.get("identity_number", {}).get("value", "")
+                or structured_fields.get("document_number", {}).get("value", "")
+                or structured_fields.get("aadhaar_number", {}).get("value", "")
+            )
             ocr_data = {
                 "owner_name": structured_fields.get("name", {}).get("value", ""),
-                "document_number": structured_fields.get("identity_number", {}).get("value", ""),
+                "document_number": doc_number,
                 "dob": structured_fields.get("dob", {}).get("value", ""),
                 "gender": structured_fields.get("gender", {}).get("value", ""),
                 "issue_date": structured_fields.get("issue_date", {}).get("value", ""),
@@ -412,6 +408,22 @@ class DocumentManager:
                 "district": structured_fields.get("district", {}).get("value", ""),
                 "pin_code": structured_fields.get("pin_code", {}).get("value", ""),
             }
+
+            # ── Build per-field confidence map ───────────────────────────────────
+            field_confidence = {
+                "owner_name": round(float(structured_fields.get("name", {}).get("confidence", 0.0) or 0.0), 1),
+                "document_number": round(float(
+                    structured_fields.get("identity_number", {}).get("confidence", 0.0)
+                    or structured_fields.get("masked_aadhaar", {}).get("confidence", 0.0)
+                    or structured_fields.get("document_number", {}).get("confidence", 0.0)
+                    or 0.0
+                ), 1),
+                "dob": round(float(structured_fields.get("dob", {}).get("confidence", 0.0) or 0.0), 1),
+                "gender": round(float(structured_fields.get("gender", {}).get("confidence", 0.0) or 0.0), 1),
+            }
+            for field_key, field_val in structured_fields.items():
+                if isinstance(field_val, dict) and field_val.get("value"):
+                    field_confidence[field_key] = round(float(field_val.get("confidence", 0.0) or 0.0), 1)
 
             # Mirror to verified_data (user can correct later)
             verified_data = dict(ocr_data)
@@ -443,6 +455,76 @@ class DocumentManager:
                 version = DuplicateDetector.get_version_count(user_id, document_type) + 1
                 DuplicateDetector.deactivate_previous_versions(user_id, document_type)
             timings["duplicate_check"] = round(time.time() - t0, 3)
+
+            # ── Calculate Match Score ────────────────────────────────────────────
+            # Match is the percentage of extracted OCR fields that match the user's verified identity profile
+            # If identity lock does not exist yet (e.g. initial Aadhaar verify), default match to 100% or based on user details if available.
+            from vault.identity_matcher import evaluate_identity_match, get_user_identity
+            user, identity_profile = get_user_identity(user_id)
+            identity_locked = bool(user.get("identity_locked", False)) if user else False
+            
+            match_score = 100.0
+            if identity_locked and identity_profile:
+                # Compare fields: Name, DOB, Gender, Identity Number, Address
+                fields_to_compare = []
+                fields_matched = 0
+                
+                # 1. Name
+                prof_name = identity_profile.get("fullName", "")
+                ocr_name = ocr_data.get("owner_name", "")
+                if prof_name and ocr_name:
+                    fields_to_compare.append("name")
+                    from vault.identity_matcher import calculate_name_similarity
+                    if calculate_name_similarity(prof_name, ocr_name) >= 85.0:
+                        fields_matched += 1
+                        
+                # 2. DOB
+                prof_dob = VaultUtils.normalize_date(identity_profile.get("dob", ""))
+                ocr_dob = VaultUtils.normalize_date(ocr_data.get("dob", ""))
+                if prof_dob and ocr_dob:
+                    fields_to_compare.append("dob")
+                    if prof_dob == ocr_dob:
+                        fields_matched += 1
+                        
+                # 3. Gender
+                prof_gender = VaultUtils.normalize_gender(identity_profile.get("gender", ""))
+                ocr_gender = VaultUtils.normalize_gender(ocr_data.get("gender", ""))
+                if prof_gender and ocr_gender:
+                    fields_to_compare.append("gender")
+                    if prof_gender == ocr_gender:
+                        fields_matched += 1
+                        
+                # 4. Identity Number (Last 4 digits or exact match if references are present)
+                prof_ref = str(identity_profile.get("aadhaarReferenceId", "")).strip()
+                ocr_ref = str(ocr_data.get("document_number", "")).strip()
+                if prof_ref and ocr_ref:
+                    fields_to_compare.append("id")
+                    if prof_ref[-4:] == ocr_ref[-4:] or prof_ref == ocr_ref:
+                        fields_matched += 1
+                        
+                # 5. Address
+                prof_addr = identity_profile.get("address", "")
+                ocr_addr = ocr_data.get("address", "")
+                if prof_addr and ocr_addr:
+                    fields_to_compare.append("address")
+                    if VaultUtils.similarity(prof_addr, ocr_addr) >= 60.0:
+                        fields_matched += 1
+                
+                if fields_to_compare:
+                    match_score = round((fields_matched / len(fields_to_compare)) * 100.0, 2)
+            else:
+                # No lock exists yet (Aadhaar verification is initializing identity)
+                # Calculate match against the user registered profile name if available
+                if user and user.get("name") and ocr_data.get("owner_name"):
+                    from vault.identity_matcher import calculate_name_similarity
+                    match_score = calculate_name_similarity(user.get("name"), ocr_data.get("owner_name"))
+                    
+            # ── Calculate Quality Score ──────────────────────────────────────────
+            # Quality score is calculated using OCR confidence, image resolution, blur, contrast, and brightness.
+            quality_details = QualityDetector.analyze(primary_path)
+            quality_score = float(quality_details.get("quality_score", 100.0))
+            # Blend with OCR confidence
+            blended_quality = round((quality_score * 0.4) + (ocr_confidence * 0.6), 2)
 
             # ── Stage 12: Encrypt & Store ────────────────────────────────────────
             masked_fields = self._mask_sensitive_fields(structured_fields)
@@ -489,17 +571,20 @@ class DocumentManager:
                 "verified_data": verified_data,
                 "metadata": ocr_data,  # Legacy compat
 
-                # Confidence
+                # Confidence and Metrics
                 "confidence": round(ocr_confidence, 2),
                 "confidence_tier": confidence_tier,
                 "field_confidence": field_confidence,
+                "identity_match_score": match_score,
+                "match": match_score,
+                "quality_score": blended_quality,
 
                 # Processing metrics
                 "processing_time": round(time.time() - upload_start, 3),
                 "stage_timings": timings,
 
                 # Supplementary
-                "quality": QualityDetector.analyze(primary_path),
+                "quality": quality_details,
                 "qr": qr_result,
                 "classification": classification,
                 "search_index": self._build_search_index({
